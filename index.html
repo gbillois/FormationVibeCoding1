@@ -23,12 +23,13 @@
     .status { display:flex; align-items:center; gap:8px; font-size:13px; color:#c7d3e8; }
     .status::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--lime); box-shadow:0 0 12px var(--lime); }
     .question-count { color:var(--muted); font-size:13px; } .question-count strong { color:white; }
-    .board-wrap { position:relative; aspect-ratio:1.55; min-height:320px; overflow:hidden; border-radius:14px; border:1px solid rgba(70,232,212,.18); background:#061329; }
+    .board-wrap { position:relative; aspect-ratio:1.5; min-height:320px; overflow:hidden; border-radius:14px; border:1px solid rgba(70,232,212,.18); background:#061329; }
     canvas { width:100%; height:100%; display:block; }
     .start-layer { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:24px; background:rgba(4,13,29,.72); backdrop-filter:blur(3px); transition:.2s; }
     .start-layer.hidden { opacity:0; visibility:hidden; }
     .start-layer h2 { margin:0 0 6px; font-size:28px; } .start-layer p { margin:0 0 20px; color:#aebdd4; max-width:390px; }
     button { font:inherit; }
+    button:focus-visible { outline:3px solid white; outline-offset:3px; }
     .primary { cursor:pointer; border:0; border-radius:10px; padding:12px 20px; color:#03151d; font-weight:800; background:linear-gradient(135deg,var(--cyan),var(--lime)); box-shadow:0 8px 24px rgba(70,232,212,.2); }
     .hint { display:flex; justify-content:center; align-items:center; gap:9px; margin-top:15px; color:var(--muted); font-size:12px; }
     kbd { min-width:25px; padding:3px 7px; color:#dce7f8; border:1px solid #385173; border-bottom-width:2px; border-radius:5px; background:#152b4b; font:600 11px system-ui; text-align:center; }
@@ -67,9 +68,9 @@
     <main>
       <section class="card game-card">
         <div class="game-top"><div class="status" id="status">System ready</div><div class="question-count">Challenge <strong id="counter">0 / 10</strong></div></div>
-        <div class="board-wrap"><canvas id="board" width="720" height="464" aria-label="Snake game board"></canvas><div class="start-layer" id="start"><div><div class="eyebrow">10 blocks · 10 questions</div><h2>Prove your cyber skills</h2><p>Collect a data block, answer the challenge, and keep moving. Nine correct answers validates your skills.</p><button class="primary" id="startBtn">Start challenge</button></div></div></div>
+        <div class="board-wrap"><canvas id="board" width="720" height="480" role="img" aria-label="Snake game board"></canvas><div class="start-layer" id="start"><div><div class="eyebrow">10 blocks · 10 questions</div><h2>Prove your cyber skills</h2><p>Collect a data block, answer the challenge, and keep moving. Nine correct answers validates your skills.</p><button class="primary" id="startBtn" type="button">Start challenge</button></div></div></div>
         <div class="hint"><span>Move with</span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>or</span><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
-        <div class="touch" aria-label="Touch controls"><button class="up" data-dir="up">▲</button><button class="left" data-dir="left">◀</button><button class="down" data-dir="down">▼</button><button class="right" data-dir="right">▶</button></div>
+        <div class="touch" aria-label="Touch controls"><button class="up" data-dir="up" type="button" aria-label="Move up">▲</button><button class="left" data-dir="left" type="button" aria-label="Move left">◀</button><button class="down" data-dir="down" type="button" aria-label="Move down">▼</button><button class="right" data-dir="right" type="button" aria-label="Move right">▶</button></div>
       </section>
       <aside>
         <section class="card stat-card"><div class="stat"><span>Score</span><strong id="score">0</strong></div><div class="stat"><span>Accuracy</span><strong id="accuracy">—</strong></div></section>
@@ -79,7 +80,7 @@
     </main>
   </div>
   <div class="modal" id="quiz" role="dialog" aria-modal="true" aria-labelledby="question"><div class="dialog"><div class="dialog-top"><span class="tag" id="domain">IAM</span><span class="progress" id="qProgress">Question 1 of 10</span></div><h2 id="question"></h2><div class="answers" id="answers"></div><p class="feedback" id="feedback" aria-live="polite"></p></div></div>
-  <div class="modal" id="finish" role="dialog" aria-modal="true"><div class="dialog result"><div class="eyebrow">Challenge complete</div><div class="score-ring" id="finalScore">0/10</div><h2 id="resultTitle">Keep training</h2><p id="resultText"></p><button class="primary" id="again">Play again</button></div></div>
+  <div class="modal" id="finish" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultText"><div class="dialog result"><div class="eyebrow">Challenge complete</div><div class="score-ring" id="finalScore">0/10</div><h2 id="resultTitle">Keep training</h2><p id="resultText"></p><button class="primary" id="again" type="button">Play again</button></div></div>
   <script>
     const bank = [
       ['IAM','Which principle gives users only the access required to perform their job?',['Giving all employees standard administrator rights','Role-based access with broad department permissions','Least privilege with task-specific permissions'],2],
@@ -115,17 +116,24 @@
     ];
     const canvas=document.getElementById('board'),ctx=canvas.getContext('2d'),quiz=document.getElementById('quiz');
     const cols=24,rows=16,cell=canvas.width/cols; let snake,food,dir,nextDir,timer,playing=false,paused=false,selected=[],asked=0,correct=0;
-    const shuffle=a=>a.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(v=>v[1]);
+    function shuffle(values){
+      const result=[...values];
+      for(let i=result.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [result[i],result[j]]=[result[j],result[i]];
+      }
+      return result;
+    }
     function reset(){ clearInterval(timer); selected=shuffle(bank).slice(0,10); asked=correct=0; snake=[{x:7,y:8},{x:6,y:8},{x:5,y:8}];dir=nextDir={x:1,y:0};food={x:16,y:8};playing=false;paused=false; updateStats();draw();document.getElementById('finish').classList.remove('open');document.getElementById('start').classList.remove('hidden');document.getElementById('status').textContent='System ready'; }
     function start(){playing=true;document.getElementById('start').classList.add('hidden');document.getElementById('status').textContent='Challenge active';timer=setInterval(step,115);}
     function step(){if(!playing||paused)return;dir=nextDir;let h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};if(h.x<0)h.x=cols-1;if(h.x>=cols)h.x=0;if(h.y<0)h.y=rows-1;if(h.y>=rows)h.y=0;if(snake.some(s=>s.x===h.x&&s.y===h.y)){snake=[{x:7,y:8},{x:6,y:8},{x:5,y:8}];dir=nextDir={x:1,y:0};placeFood();draw();return;}snake.unshift(h);if(h.x===food.x&&h.y===food.y){paused=true;showQuestion();}else snake.pop();draw();}
     function placeFood(){do{food={x:Math.floor(Math.random()*cols),y:Math.floor(Math.random()*rows)}}while(snake.some(s=>s.x===food.x&&s.y===food.y));}
     function draw(){ctx.fillStyle='#061329';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='rgba(72,129,170,.11)';ctx.lineWidth=1;for(let x=0;x<=cols;x++){ctx.beginPath();ctx.moveTo(x*cell,0);ctx.lineTo(x*cell,canvas.height);ctx.stroke()}for(let y=0;y<=rows;y++){ctx.beginPath();ctx.moveTo(0,y*cell);ctx.lineTo(canvas.width,y*cell);ctx.stroke()}ctx.shadowBlur=18;ctx.shadowColor='#b7ff5e';ctx.fillStyle='#b7ff5e';ctx.fillRect(food.x*cell+7,food.y*cell+7,cell-14,cell-14);ctx.shadowBlur=0;snake.forEach((s,i)=>{ctx.fillStyle=i?'#29bdb4':'#46e8d4';ctx.beginPath();ctx.roundRect(s.x*cell+2,s.y*cell+2,cell-4,cell-4,7);ctx.fill()});}
-    function showQuestion(){const q=selected[asked];document.getElementById('domain').textContent=q[0];document.getElementById('qProgress').textContent=`Question ${asked+1} of 10`;document.getElementById('question').textContent=q[1];document.getElementById('feedback').textContent='';const answers=document.getElementById('answers');answers.innerHTML='';shuffle(q[2].map((text,i)=>({text,correct:i===q[3]}))).forEach((a,i)=>{const b=document.createElement('button');b.className='answer';b.innerHTML=`<span class="letter">${'ABC'[i]}</span><span>${a.text}</span>`;b.onclick=()=>answer(b,a.correct);answers.appendChild(b)});quiz.classList.add('open');setTimeout(()=>answers.querySelector('button').focus(),200);}
+    function showQuestion(){const q=selected[asked];document.getElementById('domain').textContent=q[0];document.getElementById('qProgress').textContent=`Question ${asked+1} of 10`;document.getElementById('question').textContent=q[1];document.getElementById('feedback').textContent='';const answers=document.getElementById('answers');answers.replaceChildren();shuffle(q[2].map((text,i)=>({text,correct:i===q[3]}))).forEach((a,i)=>{const b=document.createElement('button');const letter=document.createElement('span');const label=document.createElement('span');b.type='button';b.className='answer';letter.className='letter';letter.textContent='ABC'[i];label.textContent=a.text;b.append(letter,label);b.onclick=()=>answer(b,a.correct);answers.appendChild(b)});quiz.classList.add('open');setTimeout(()=>answers.querySelector('button')?.focus(),200);}
     function answer(button,isCorrect){document.querySelectorAll('.answer').forEach(b=>b.disabled=true);button.classList.add(isCorrect?'correct':'wrong');if(isCorrect){correct++;document.getElementById('feedback').textContent='Correct — threat neutralized.'}else{document.getElementById('feedback').textContent='Not quite. The strongest answer is highlighted.';[...document.querySelectorAll('.answer')].find(b=>b.textContent.includes(selected[asked][2][selected[asked][3]])).classList.add('correct')}asked++;updateStats();setTimeout(()=>{quiz.classList.remove('open');snake.pop();placeFood();draw();if(asked===10)finish();else paused=false},1100);}
     function updateStats(){document.getElementById('score').textContent=correct;document.getElementById('counter').textContent=`${asked} / 10`;document.getElementById('accuracy').textContent=asked?`${Math.round(correct/asked*100)}%`:'—';}
-    function finish(){playing=false;clearInterval(timer);const pass=correct>8;document.getElementById('finalScore').textContent=`${correct}/10`;document.getElementById('resultTitle').textContent=pass?'Skills validated':'Keep training';document.getElementById('resultText').textContent=pass?'Outstanding work. You demonstrated strong cyber judgment across all four domains.':'Review the challenge domains and try again. Score 9 or more to validate your skills.';document.getElementById('finish').classList.add('open');document.getElementById('status').textContent='Challenge complete';}
-    function turn(x,y){if(!playing||paused)return;if(x!==-dir.x||y!==-dir.y)nextDir={x,y};}
+    function finish(){playing=false;clearInterval(timer);const pass=correct>8;document.getElementById('finalScore').textContent=`${correct}/10`;document.getElementById('resultTitle').textContent=pass?'Skills validated':'Keep training';document.getElementById('resultText').textContent=pass?'Outstanding work. You demonstrated strong cyber judgment across all four domains.':'Review the challenge domains and try again. Score 9 or more to validate your skills.';document.getElementById('finish').classList.add('open');document.getElementById('status').textContent='Challenge complete';setTimeout(()=>document.getElementById('again').focus(),200);}
+    function turn(x,y){if(!playing||paused)return;if(x!==-nextDir.x||y!==-nextDir.y)nextDir={x,y};}
     addEventListener('keydown',e=>{const m={ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};if(m[e.key]){e.preventDefault();turn(...m[e.key])}});
     document.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>{const d={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[b.dataset.dir];turn(...d)});document.getElementById('startBtn').onclick=start;document.getElementById('again').onclick=reset;reset();
   </script>
